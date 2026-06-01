@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 03988b1f1e5bd7440a1dab33122ede10
+guid: e6a1edb10b708b1459955e0956df8ef9
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 1374742051037312497
-    second: QUIT_0
+      213: -537563614448136770
+    second: Slovakia_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,23 +126,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: QUIT_0
+      name: Slovakia_0
       rect:
         serializedVersion: 2
-        x: 595
-        y: 1027
-        width: 435
-        height: 439
+        x: 0
+        y: 0
+        width: 4961
+        height: 7016
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 1f5fed99c90141310800000000000000
-      internalID: 1374742051037312497
+      spriteID: ebdc4a4adb03a88f0800000000000000
+      internalID: -537563614448136770
       vertices: []
       indices: 
       edges: []
@@ -151,7 +151,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 1cfc5e502c875d04fb60556117eb155b
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      QUIT_0: 1374742051037312497
+      Slovakia_0: -537563614448136770
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

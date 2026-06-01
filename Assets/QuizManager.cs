@@ -34,6 +34,9 @@ public class QuizManager : MonoBehaviour
     public GameObject correctFeedbackPanel;
     public GameObject incorrectFeedbackPanel;
     public GameObject leaderboardPanel;
+    public GameObject howToPlayPanel;          
+    public GameObject confirmSlotDeletePanel;  
+    public GameObject confirmHomePanel;        
 
     [Header("UI Elements")]
     public TMP_Text questionLabel;
@@ -41,8 +44,13 @@ public class QuizManager : MonoBehaviour
     public Image profileDisplayImage;
 
     [Header("Save Slot UI")]
-    public TMP_Text[] saveSlotTexts;     public TMP_InputField playerNameInput;
+    public TMP_Text[] saveSlotTexts;     
+    public TMP_InputField playerNameInput;
     public TMP_Text leaderboardText;
+
+    [Header("Profile Panel Settings")]
+    public Button profileNextButton;      
+    public Button profileHomeButton;
 
     [Header("Dynamic Lists")]
     public GameObject buttonPrefab; 
@@ -55,18 +63,40 @@ public class QuizManager : MonoBehaviour
     private CountryData currentTarget;
     private string correctStatement;
 
-    // Game State variables
     private int currentAttempts = 0;
     private int currentScore = 0;
     private int currentSaveSlot = -1;
     private string currentPlayerName = "";
+    
+    private int slotToDeleteIndex = -1;         
+    private Coroutine profileButtonCoroutine;
+
+    // Safety lock state to prevent click-spam UI exploits
+    private bool isAnswering = false;
 
     void Start() {
+        Debug.Log("DEBUG: Starting QuizManager...");
         LoadCSV();
+        Debug.Log("DEBUG: CSV Loaded, showing menu...");
         ShowPage("menu");
     }
 
-    public void GoToMenu() { ShowPage("menu"); }
+    public void GoToMenu() { 
+        ResetGameState();
+        ShowPage("menu"); 
+    }
+
+    void ResetGameState() {
+        currentSaveSlot = -1;
+        currentPlayerName = "";
+        currentScore = 0;
+        currentAttempts = 0;
+        visitedCountries.Clear();
+        availableFrontier.Clear();
+        currentTarget = null;
+        correctStatement = "";
+        isAnswering = false;
+    }
 
     void LoadCSV() {
         allCountries.Clear();
@@ -95,6 +125,7 @@ public class QuizManager : MonoBehaviour
                 allCountries.Add(country);
             }
         }
+        Debug.Log($"DEBUG: CSV parsed. Found {allCountries.Count} countries.");
     }
 
     string CategorizeFact(string fact) {
@@ -111,7 +142,7 @@ public class QuizManager : MonoBehaviour
     }
 
     void RefreshSaveSlots() {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             string slotName = PlayerPrefs.GetString($"Slot{i}_Name", "");
             if (string.IsNullOrEmpty(slotName)) {
                 saveSlotTexts[i].text = "+ Empty Slot";
@@ -127,13 +158,20 @@ public class QuizManager : MonoBehaviour
         string slotName = PlayerPrefs.GetString($"Slot{slotIndex}_Name", "");
 
         if (string.IsNullOrEmpty(slotName)) {
+            currentPlayerName = "";
+            currentScore = 0;
+            visitedCountries.Clear();
+            availableFrontier.Clear();
+
             playerNameInput.text = "";
             ShowPage("nameInput");
         } else {
             currentPlayerName = slotName;
             currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
             string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
-            visitedCountries = string.IsNullOrEmpty(visitedStr) ? new List<string>() : visitedStr.Split(',').ToList();
+            
+            // Fixed: Split using pipe delimiter to prevent comma corruption in names
+            visitedCountries = string.IsNullOrEmpty(visitedStr) ? new List<string>() : visitedStr.Split('|').ToList();
             
             GoToNeighborSelection(); 
         }
@@ -152,6 +190,24 @@ public class QuizManager : MonoBehaviour
     }
 
     public void DeleteSaveSlot(int slotIndex) {
+        slotToDeleteIndex = slotIndex;
+        if (confirmSlotDeletePanel) confirmSlotDeletePanel.SetActive(true);
+    }
+
+    public void ConfirmDeleteSaveSlot() {
+        if (slotToDeleteIndex != -1) {
+            ExecuteDeleteSaveSlot(slotToDeleteIndex);
+            slotToDeleteIndex = -1;
+        }
+        if (confirmSlotDeletePanel) confirmSlotDeletePanel.SetActive(false);
+    }
+
+    public void CancelDeleteSaveSlot() {
+        slotToDeleteIndex = -1;
+        if (confirmSlotDeletePanel) confirmSlotDeletePanel.SetActive(false);
+    }
+
+    void ExecuteDeleteSaveSlot(int slotIndex) {
         PlayerPrefs.DeleteKey($"Slot{slotIndex}_Name");
         PlayerPrefs.DeleteKey($"Slot{slotIndex}_Score");
         PlayerPrefs.DeleteKey($"Slot{slotIndex}_Visited");
@@ -162,7 +218,9 @@ public class QuizManager : MonoBehaviour
         if (currentSaveSlot == -1) return;
         PlayerPrefs.SetString($"Slot{currentSaveSlot}_Name", currentPlayerName);
         PlayerPrefs.SetInt($"Slot{currentSaveSlot}_Score", currentScore);
-        PlayerPrefs.SetString($"Slot{currentSaveSlot}_Visited", string.Join(",", visitedCountries));
+        
+        // Fixed: Join using pipe characters so country data parsing doesn't break on commas
+        PlayerPrefs.SetString($"Slot{currentSaveSlot}_Visited", string.Join("|", visitedCountries));
         PlayerPrefs.Save();
     }
 
@@ -209,6 +267,7 @@ public class QuizManager : MonoBehaviour
     }
 
     void GenerateQuizOptions() {
+        isAnswering = false; // Reset the safety lock when a new set of options is generated
         correctStatement = GetWeightedFact(currentTarget.facts);
         questionLabel.text = $"Identify the fact about {currentTarget.name}:";
 
@@ -245,7 +304,11 @@ public class QuizManager : MonoBehaviour
     }
 
     public void SelectAnswer(int index) {
+        // Prevent registering inputs multiple times if the user click-spams before screen changes
+        if (isAnswering) return;
+
         if (statementButtons[index].text == correctStatement) {
+            isAnswering = true; // Lock further interactions down immediately on a correct hit
             if (currentAttempts == 0) currentScore += 100;
             else if (currentAttempts == 1) currentScore += 50;
             else if (currentAttempts == 2) currentScore += 25;
@@ -266,17 +329,28 @@ public class QuizManager : MonoBehaviour
     }
 
     void EndGame() {
-        string lbNames = PlayerPrefs.GetString("LeaderboardNames", "");
-        string lbScores = PlayerPrefs.GetString("LeaderboardScores", "");
-        
-        lbNames += currentPlayerName + ",";
-        lbScores += currentScore + ",";
-        
-        PlayerPrefs.SetString("LeaderboardNames", lbNames);
-        PlayerPrefs.SetString("LeaderboardScores", lbScores);
+        string[] names = PlayerPrefs.GetString("LeaderboardNames", "").Split(new char[]{','}, System.StringSplitOptions.RemoveEmptyEntries);
+        string[] scoresStr = PlayerPrefs.GetString("LeaderboardScores", "").Split(new char[]{','}, System.StringSplitOptions.RemoveEmptyEntries);
+
+        var lbList = new List<KeyValuePair<string, int>>();
+        for(int i = 0; i < names.Length; i++) {
+            if (i < scoresStr.Length) {
+                lbList.Add(new KeyValuePair<string, int>(names[i], int.Parse(scoresStr[i])));
+            }
+        }
+
+        lbList.Add(new KeyValuePair<string, int>(currentPlayerName, currentScore));
+
+        lbList = lbList.OrderByDescending(x => x.Value).Take(10).ToList();
+
+        string newNames = string.Join(",", lbList.Select(x => x.Key));
+        string newScores = string.Join(",", lbList.Select(x => x.Value));
+
+        PlayerPrefs.SetString("LeaderboardNames", newNames);
+        PlayerPrefs.SetString("LeaderboardScores", newScores);
         PlayerPrefs.Save();
 
-        DeleteSaveSlot(currentSaveSlot);
+        ExecuteDeleteSaveSlot(currentSaveSlot);
 
         ShowLeaderboard();
     }
@@ -287,13 +361,14 @@ public class QuizManager : MonoBehaviour
 
         var lbList = new List<KeyValuePair<string, int>>();
         for(int i = 0; i < names.Length; i++) {
-            lbList.Add(new KeyValuePair<string, int>(names[i], int.Parse(scoresStr[i])));
+            if (i < scoresStr.Length) {
+                lbList.Add(new KeyValuePair<string, int>(names[i], int.Parse(scoresStr[i])));
+            }
         }
 
-        // Sort descending
         lbList = lbList.OrderByDescending(x => x.Value).ToList();
 
-        string display = "LEADERBOARD\n\n";
+        string display = "";
         for(int i = 0; i < lbList.Count; i++) {
             display += $"{i+1}. {lbList[i].Key} - {lbList[i].Value} pts\n";
         }
@@ -301,7 +376,6 @@ public class QuizManager : MonoBehaviour
 
         ShowPage("leaderboard");
     }
-
 
     public void OnSkipScanClicked() {
         Sprite profileSprite = Resources.Load<Sprite>($"Profiles/{currentTarget.name}");
@@ -314,6 +388,33 @@ public class QuizManager : MonoBehaviour
     }
 
     public void OnSkipProfile() { GoToNeighborSelection(); }
+
+    System.Collections.IEnumerator EnableButtonsAfterDelay() {
+        if (profileNextButton != null && profileHomeButton != null) {
+            profileNextButton.interactable = false;
+            profileHomeButton.interactable = false;
+            yield return new WaitForSeconds(3f);
+            profileNextButton.interactable = true;
+            profileHomeButton.interactable = true;
+        }
+    }
+
+    public void OpenHomeConfirmation() {
+        if (confirmHomePanel) confirmHomePanel.SetActive(true);
+    }
+
+    public void ConfirmGoToMenu() {
+        if (confirmHomePanel) confirmHomePanel.SetActive(false);
+        GoToMenu();
+    }
+
+    public void CancelGoToMenu() {
+        if (confirmHomePanel) confirmHomePanel.SetActive(false);
+    }
+
+    public void ShowHowToPlay() {
+        ShowPage("howToPlay");
+    }
 
     void PopulateList(List<string> items, Transform container, System.Action<string> onClickAction) {
         foreach (Transform child in container) Destroy(child.gameObject);
@@ -336,5 +437,15 @@ public class QuizManager : MonoBehaviour
         if (correctFeedbackPanel) correctFeedbackPanel.SetActive(page == "correctFeedback");
         if (incorrectFeedbackPanel) incorrectFeedbackPanel.SetActive(page == "incorrectFeedback");
         if (leaderboardPanel) leaderboardPanel.SetActive(page == "leaderboard");
+        if (howToPlayPanel) howToPlayPanel.SetActive(page == "howToPlay");
+
+        if (page == "profile") {
+            if (profileButtonCoroutine != null) StopCoroutine(profileButtonCoroutine);
+            profileButtonCoroutine = StartCoroutine(EnableButtonsAfterDelay());
+        }
+    }
+
+    public void ViewProfiles(){
+        Application.OpenURL("https://drive.google.com/file/d/12PBN7WK8JatEoFLAlW0JFUUXijxwrJn3/view?usp=sharing");
     }
 }

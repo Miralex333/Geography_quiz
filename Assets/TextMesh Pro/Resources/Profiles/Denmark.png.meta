@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 339587042712ca049af05d4b956b566e
+guid: 3d747961f84eebc44a3711026416e182
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -5613187411758644884
-    second: HOWTOPLAY-removebg-preview_0
+      213: -2833630465986982656
+    second: Denmark_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: HOWTOPLAY-removebg-preview_0
+      name: Denmark_0
       rect:
         serializedVersion: 2
-        x: 36
-        y: 183
-        width: 154
-        height: 155
+        x: 0
+        y: 0
+        width: 4961
+        height: 7016
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: c618e68f9c3f912b0800000000000000
-      internalID: -5613187411758644884
+      spriteID: 00d0f1aba1ceca8d0800000000000000
+      internalID: -2833630465986982656
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      HOWTOPLAY-removebg-preview_0: -5613187411758644884
+      Denmark_0: -2833630465986982656
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
