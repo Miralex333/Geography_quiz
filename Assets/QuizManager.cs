@@ -263,7 +263,6 @@ public class QuizManager : MonoBehaviour
 
     public void RefreshQuiz() {
         GenerateQuizOptions();
-        ShowPage("quiz");
     }
 
     void GenerateQuizOptions() {
