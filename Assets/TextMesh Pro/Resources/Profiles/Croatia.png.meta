@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 6573fe844dc38e341a2b973d8097b7f8
+guid: e4b6a86b2c3766d44b4158e8bf8434d5
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4723983704816691999
-    second: Luxembourg_0
+      213: 4059578691888074158
+    second: Croatia_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Luxembourg_0
+      name: Croatia_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 4961
-        height: 7016
+        width: 1080
+        height: 1527
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f1b255a9626fe8140800000000000000
-      internalID: 4723983704816691999
+      spriteID: eadcbbbcf45865830800000000000000
+      internalID: 4059578691888074158
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Luxembourg_0: 4723983704816691999
+      Croatia_0: 4059578691888074158
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

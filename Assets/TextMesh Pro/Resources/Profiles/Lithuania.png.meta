@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 220d24a703291ee4982284f47808867a
+guid: 8fdb0bfe3c13cfc49844c83d91ae0d69
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -4000225086859184497
-    second: Czech Republic_0
+      213: -8707946710074406992
+    second: Lithuania_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Czech Republic_0
+      name: Lithuania_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 4961
-        height: 7016
+        width: 1080
+        height: 1527
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f86f6244a785c78c0800000000000000
-      internalID: -4000225086859184497
+      spriteID: 0b7cbf69a98272780800000000000000
+      internalID: -8707946710074406992
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Czech Republic_0: -4000225086859184497
+      Lithuania_0: -8707946710074406992
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

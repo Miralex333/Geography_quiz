@@ -36,7 +36,8 @@ public class QuizManager : MonoBehaviour
     public GameObject leaderboardPanel;
     public GameObject howToPlayPanel;          
     public GameObject confirmSlotDeletePanel;  
-    public GameObject confirmHomePanel;        
+    public GameObject confirmHomePanel;   
+    //public GameObject downloadFriendshipBookPanel;     
 
     [Header("UI Elements")]
     public TMP_Text questionLabel;
@@ -48,6 +49,10 @@ public class QuizManager : MonoBehaviour
     public TMP_InputField playerNameInput;
     public TMP_Text leaderboardText;
 
+    [Header("Fade Feedback Settings")]
+    public Image fadeOverlayImage; 
+    public float fadeSpeed = 2.5f;  
+
     [Header("Profile Panel Settings")]
     public Button profileNextButton;      
     public Button profileHomeButton;
@@ -56,6 +61,11 @@ public class QuizManager : MonoBehaviour
     public GameObject buttonPrefab; 
     public Transform startSelectContent; 
     public Transform neighborSelectContent; 
+
+    [Header("Audio Settings")]
+    public AudioSource audioSource;
+    public AudioClip correctSound;
+    public AudioClip incorrectSound;
 
     private List<CountryData> allCountries = new List<CountryData>();
     private List<string> visitedCountries = new List<string>();
@@ -170,7 +180,6 @@ public class QuizManager : MonoBehaviour
             currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
             string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
             
-            // Fixed: Split using pipe delimiter to prevent comma corruption in names
             visitedCountries = string.IsNullOrEmpty(visitedStr) ? new List<string>() : visitedStr.Split('|').ToList();
             
             GoToNeighborSelection(); 
@@ -290,7 +299,7 @@ public class QuizManager : MonoBehaviour
         int roll = Random.Range(0, 100);
         string targetCategory = "funfact";
 
-        if (roll < 30) targetCategory = "flag";
+        if (roll < 25) targetCategory = "flag";
         else if (roll < 60) targetCategory = "landmark";
         else if (roll < 85) targetCategory = "funfact";
         else targetCategory = "food";
@@ -303,11 +312,12 @@ public class QuizManager : MonoBehaviour
     }
 
     public void SelectAnswer(int index) {
-        // Prevent registering inputs multiple times if the user click-spams before screen changes
+        if (quizPanel == null || !quizPanel.activeSelf) return;
         if (isAnswering) return;
+        
 
         if (statementButtons[index].text == correctStatement) {
-            isAnswering = true; // Lock further interactions down immediately on a correct hit
+            isAnswering = true; 
             if (currentAttempts == 0) currentScore += 100;
             else if (currentAttempts == 1) currentScore += 50;
             else if (currentAttempts == 2) currentScore += 25;
@@ -316,12 +326,17 @@ public class QuizManager : MonoBehaviour
                 visitedCountries.Add(currentTarget.name);
             }
             SaveGame();
-            ShowPage("correctFeedback");
+            if (audioSource != null && correctSound != null) audioSource.PlayOneShot(correctSound);
+            StartCoroutine(FadeFeedback(true));
+            //ShowPage("correctFeedback");
         } else {
             currentAttempts++;
-            ShowPage("incorrectFeedback");
+            if (audioSource != null && incorrectSound != null) audioSource.PlayOneShot(incorrectSound);
+            StartCoroutine(FadeFeedback(false));
+            //ShowPage("incorrectFeedback");
         }
     }
+
 
     public void ProceedFromCorrectFeedback() {
         ShowPage("scanDummy");
@@ -340,7 +355,7 @@ public class QuizManager : MonoBehaviour
 
         lbList.Add(new KeyValuePair<string, int>(currentPlayerName, currentScore));
 
-        lbList = lbList.OrderByDescending(x => x.Value).Take(10).ToList();
+        lbList = lbList.OrderByDescending(x => x.Value).Take(5).ToList();
 
         string newNames = string.Join(",", lbList.Select(x => x.Key));
         string newScores = string.Join(",", lbList.Select(x => x.Value));
@@ -369,7 +384,7 @@ public class QuizManager : MonoBehaviour
 
         string display = "";
         for(int i = 0; i < lbList.Count; i++) {
-            display += $"{i+1}. {lbList[i].Key} - {lbList[i].Value} pts\n";
+            display += $"{lbList[i].Key} - {lbList[i].Value} pts\n";
         }
         leaderboardText.text = display;
 
@@ -416,13 +431,17 @@ public class QuizManager : MonoBehaviour
     }
 
     void PopulateList(List<string> items, Transform container, System.Action<string> onClickAction) {
-        foreach (Transform child in container) Destroy(child.gameObject);
-        foreach (string item in items) {
-            GameObject btn = Instantiate(buttonPrefab, container);
-            btn.GetComponentInChildren<TMP_Text>().text = item;
-            btn.GetComponent<Button>().onClick.AddListener(() => onClickAction(item));
-        }
+    foreach (Transform child in container) Destroy(child.gameObject);
+    foreach (string item in items) {
+        GameObject btn = Instantiate(buttonPrefab, container);
+        btn.GetComponentInChildren<TMP_Text>().text = item;
+        
+        // ADD THIS LINE: Wipe any existing hardcoded events from the prefab
+        btn.GetComponent<Button>().onClick.RemoveAllListeners();
+        
+        btn.GetComponent<Button>().onClick.AddListener(() => onClickAction(item));
     }
+}
 
     void ShowPage(string page) {
         menuPanel.SetActive(page == "menu");
@@ -445,6 +464,45 @@ public class QuizManager : MonoBehaviour
     }
 
     public void ViewProfiles(){
-        Application.OpenURL("https://drive.google.com/file/d/12PBN7WK8JatEoFLAlW0JFUUXijxwrJn3/view?usp=sharing");
+        Application.OpenURL("https://drive.google.com/file/d/1bc5yHiK988qzkBvmqnq-LNJ5Hxezqxeq/view?usp=sharing");
     }
+
+    System.Collections.IEnumerator FadeFeedback(bool isCorrect) {
+    // 1. Turn on the overlay object
+    fadeOverlayImage.gameObject.SetActive(true);
+    
+    // Pick green or red based on the answer correctness
+    Color targetColor = isCorrect ? Color.green : Color.red;
+    
+    // 2. Fade In to solid color
+    float alpha = 0f;
+    while (alpha < 1f) {
+        alpha += Time.deltaTime * fadeSpeed;
+        targetColor.a = Mathf.Clamp01(alpha);
+        fadeOverlayImage.color = targetColor;
+        yield return null;
+    }
+
+    // 3. Peak Opacity Action: Swap your UI pages behind the solid color curtain!
+    if (isCorrect) {
+        ShowPage("scanDummy"); // Seamlessly transition straight to the scan dummy panel
+    } else {
+        GenerateQuizOptions(); // Regenerate options to keep it fresh for the retry
+        ShowPage("quiz");      // Keep them on the quiz panel to try again
+    }
+
+    // Hold the solid color for a split second for impact
+    yield return new WaitForSeconds(0.15f);
+
+    // 4. Fade Out back to clear
+    while (alpha > 0f) {
+        alpha -= Time.deltaTime * fadeSpeed;
+        targetColor.a = Mathf.Clamp01(alpha);
+        fadeOverlayImage.color = targetColor;
+        yield return null;
+    }
+
+    // 5. Turn off the overlay completely so users can click buttons again
+    fadeOverlayImage.gameObject.SetActive(false);
+}
 }
