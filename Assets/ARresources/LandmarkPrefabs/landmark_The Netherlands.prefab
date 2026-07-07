@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 1950728846927536843}
   - component: {fileID: 9037315807886213991}
   m_Layer: 0
-  m_Name: landmark_Netherlands
+  m_Name: landmark_The Netherlands
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
