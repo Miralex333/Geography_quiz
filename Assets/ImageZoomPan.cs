@@ -9,17 +9,48 @@ public class ImageZoomPan : MonoBehaviour, IDragHandler
     public float maxZoom = 5f;
 
     private Vector2 originalPosition;
+    private bool isInitialized = false;
+
+    void Awake()
+    {
+        Initialize();
+    }
+
+    void OnEnable()
+    {
+        // Automatically snaps scale and position back to perfect defaults whenever the panel opens!
+        ResetZoom();
+    }
 
     void Start()
     {
-        // 1. SAFETY NET: If anyone forgot to link it on another PC, 
-        // the script automatically finds itself so it never breaks!
+        Initialize();
+    }
+
+    void Initialize()
+    {
+        if (isInitialized) return;
+        
         if (imageRect == null)
         {
             imageRect = GetComponent<RectTransform>();
         }
         
-        if (imageRect != null) originalPosition = imageRect.anchoredPosition;
+        if (imageRect != null) 
+        {
+            originalPosition = imageRect.anchoredPosition;
+            isInitialized = true;
+        }
+    }
+
+    public void ResetZoom()
+    {
+        Initialize();
+        if (imageRect != null)
+        {
+            imageRect.localScale = Vector3.one;
+            imageRect.anchoredPosition = originalPosition;
+        }
     }
 
     void Update()
@@ -40,27 +71,61 @@ public class ImageZoomPan : MonoBehaviour, IDragHandler
 
             Zoom(difference * zoomSpeed);
         }
+        // Desktop testing fallback
+        #if UNITY_EDITOR
+        else
+        {
+            float scrollInput = Input.GetAxis("Mouse ScrollWheel");
+            if (scrollInput != 0)
+            {
+                Zoom(scrollInput * 50f * zoomSpeed);
+            }
+        }
+        #endif
     }
 
     void Zoom(float increment)
     {
-        if (imageRect == null) return; // 2. Prevents background crashes if missing
+        if (imageRect == null) return; 
 
         Vector3 newScale = imageRect.localScale + new Vector3(increment, increment, 0);
         newScale.x = Mathf.Clamp(newScale.x, minZoom, maxZoom);
         newScale.y = Mathf.Clamp(newScale.y, minZoom, maxZoom);
         imageRect.localScale = newScale;
         
-        if (newScale.x <= minZoom) imageRect.anchoredPosition = originalPosition;
+        if (newScale.x <= minZoom) 
+        {
+            imageRect.anchoredPosition = originalPosition;
+        }
+        else 
+        {
+            ClampPosition();
+        }
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (imageRect == null) return; // 2. Safety check
+        if (imageRect == null) return; 
 
         if (Input.touchCount <= 1 && imageRect.localScale.x > 1f)
         {
             imageRect.anchoredPosition += eventData.delta;
+            ClampPosition(); 
         }
+    }
+
+    private void ClampPosition()
+    {
+        if (imageRect == null) return;
+
+        float boundsX = (imageRect.rect.width * imageRect.localScale.x - imageRect.rect.width) / 2f;
+        float boundsY = (imageRect.rect.height * imageRect.localScale.y - imageRect.rect.height) / 2f;
+
+        Vector2 clampedPosition = imageRect.anchoredPosition;
+        
+        clampedPosition.x = Mathf.Clamp(clampedPosition.x, originalPosition.x - boundsX, originalPosition.x + boundsX);
+        clampedPosition.y = Mathf.Clamp(clampedPosition.y, originalPosition.y - boundsY, originalPosition.y + boundsY);
+
+        imageRect.anchoredPosition = clampedPosition;
     }
 }

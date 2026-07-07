@@ -32,13 +32,16 @@ public class QuizManager : MonoBehaviour
     public GameObject profilePanel;
     public GameObject saveSlotPanel;
     public GameObject nameInputPanel;
-    public GameObject correctFeedbackPanel;
-    public GameObject incorrectFeedbackPanel;
     public GameObject leaderboardPanel;
     public GameObject howToPlayPanel;          
     public GameObject confirmSlotDeletePanel;  
     public GameObject confirmHomePanel;   
-    //public GameObject downloadFriendshipBookPanel;     
+      
+    [Header("New Flow Panels (Comics & Scan)")]
+    public GameObject howToScanPanel;
+    public GameObject luxembourgScanPanel;
+    public GameObject euComicPanel1;
+    public GameObject euComicPanel2;
 
     [Header("UI Elements")]
     public TMP_Text questionLabel;
@@ -48,7 +51,9 @@ public class QuizManager : MonoBehaviour
     [Header("Save Slot UI")]
     public TMP_Text[] saveSlotTexts;     
     public TMP_InputField playerNameInput;
+    public TMP_Text[] leaderboardSlotTexts;
     public TMP_Text leaderboardText;
+    public TMP_Text leaderboardEndScoreText;
 
     [Header("Fade Feedback Settings")]
     public Image fadeOverlayImage; 
@@ -67,6 +72,13 @@ public class QuizManager : MonoBehaviour
     public AudioSource audioSource;
     public AudioClip correctSound;
     public AudioClip incorrectSound;
+
+    [Header("Credits Gallery Settings")]
+    public GameObject creditsPanel;
+    public Image creditsDisplayContainer;
+    public Sprite[] creditsPictures;
+    public Button creditsNextButton;
+    private int currentCreditsIndex = 0;
 
     [Header("Pagination Settings")]
     public int itemsPerPage = 4;
@@ -96,7 +108,7 @@ public class QuizManager : MonoBehaviour
     private Coroutine profileButtonCoroutine;
 
     private bool isAnswering = false;
-
+    private bool hasGameJustEnded = false;
 
      [Header("ARReq")]
      public GameObject BackImg;
@@ -106,28 +118,39 @@ public class QuizManager : MonoBehaviour
      public GameObject ARCam;
      public GameObject Lite3d;
      
-     public string     CurrentCountry="Null";
-
-   public  string factText;
-   public  string category;
+    public string CurrentCountry="Null";
+    public string factText;
+    public string category;
     public string arCategory;
 
+    public float bounceCooldownDuration = 4.0f; // <-- CHANGE THIS VALUE TO INCREASE/DECREASE COOLDOWN (e.g., 5.0f is 5 seconds)
+
+    private float sharedBounceCooldown = 0f;
 
 
 
     void Start() {
-        Debug.Log("DEBUG: Starting QuizManager...");
         LoadCSV();
-        Debug.Log("DEBUG: CSV Loaded, showing menu...");
-
         if (friendshipBookButton != null) friendshipBookButton.SetActive(false);
-        // if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
+        if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
+        StartCoroutine(BouncePaginationLoop());
+        
         ShowPage("menu");
     }
 
     public void GoToMenu() { 
         if (friendshipBookButton != null) friendshipBookButton.SetActive(false);
-        // if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
+        
+        if (leaderboardEndScoreText != null) {
+            leaderboardEndScoreText.text = "";
+        }
+
+        if (confettiVideoObject != null) {
+            VideoPlayer vp = confettiVideoObject.GetComponent<VideoPlayer>();
+            if (vp != null) vp.Stop();
+            confettiVideoObject.SetActive(false);
+        }
+
         ResetGameState();
         ShowPage("menu"); 
     }
@@ -272,11 +295,14 @@ public class QuizManager : MonoBehaviour
             currentScore = 0;
             visitedCountries.Clear();
             SaveGame();
-            
             PopulateList(allCountries.Select(c => c.name).ToList(), startSelectContent, OnStartCountryPicked);
-            ShowPage("startSelect");
+            ShowPage("euComic1");
         }
     }
+
+    public void ProceedToComic2() { ShowPage("euComic2"); }
+    public void ProceedToStartSelect() { ShowPage("startSelect"); }
+    public void ProceedToScanDummy() { ShowPage("scanDummy"); }
 
     public void DeleteSaveSlot(int slotIndex) {
         slotToDeleteIndex = slotIndex;
@@ -319,7 +345,13 @@ public class QuizManager : MonoBehaviour
         SaveGame();
        // OnCorrectAnswerSelected();
         //ShowPage("profile");
-        OnSkipScanClicked();
+        //OnSkipScanClicked();
+
+        if (currentTarget != null && currentTarget.name == "Luxembourg") {
+            ShowPage("luxembourgScan");
+        } else {
+            ShowPage("howToScan");
+        }
         
     }
 
@@ -396,6 +428,7 @@ public class QuizManager : MonoBehaviour
         return facts[Random.Range(0, facts.Count)].text;
     }
 
+
     public void SelectAnswer(int index) {
         if (quizPanel == null || !quizPanel.activeSelf) return;
         if (isAnswering) return;
@@ -425,12 +458,9 @@ public class QuizManager : MonoBehaviour
     }
 
 
-    /*public void ProceedFromCorrectFeedback() {
-        ShowPage("scanDummy");
-        
-    }*/
-
     void EndGame() {
+        hasGameJustEnded = true; 
+        
         string[] names = PlayerPrefs.GetString("LeaderboardNames", "").Split(new char[]{','}, System.StringSplitOptions.RemoveEmptyEntries);
         string[] scoresStr = PlayerPrefs.GetString("LeaderboardScores", "").Split(new char[]{','}, System.StringSplitOptions.RemoveEmptyEntries);
 
@@ -442,7 +472,6 @@ public class QuizManager : MonoBehaviour
         }
 
         lbList.Add(new KeyValuePair<string, int>(currentPlayerName, currentScore));
-
         lbList = lbList.OrderByDescending(x => x.Value).Take(5).ToList();
 
         string newNames = string.Join(",", lbList.Select(x => x.Key));
@@ -453,11 +482,10 @@ public class QuizManager : MonoBehaviour
         PlayerPrefs.Save();
 
         ExecuteDeleteSaveSlot(currentSaveSlot);
-
         if (friendshipBookButton != null) friendshipBookButton.SetActive(true);
-
-        // if (confettiVideoObject != null) PlayConfetti();
-
+        if (leaderboardEndScoreText != null) {
+            leaderboardEndScoreText.text = $"{currentScore} pts";
+        }
         ShowLeaderboard();
     }
 
@@ -466,14 +494,14 @@ public class QuizManager : MonoBehaviour
         VideoPlayer vp = confettiVideoObject.GetComponent<VideoPlayer>();
         
         if (vp != null) {
-            vp.loopPointReached -= DisableConfetti; // Safety check to prevent duplicate listeners
+            vp.loopPointReached -= DisableConfetti; 
             vp.loopPointReached += DisableConfetti; 
             vp.Play();
         }
     }
 
     void DisableConfetti(VideoPlayer vp) {
-        vp.loopPointReached -= DisableConfetti; // Clean up the listener
+        vp.loopPointReached -= DisableConfetti; 
         if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
     }
 
@@ -487,19 +515,38 @@ public class QuizManager : MonoBehaviour
                 lbList.Add(new KeyValuePair<string, int>(names[i], int.Parse(scoresStr[i])));
             }
         }
-
         lbList = lbList.OrderByDescending(x => x.Value).ToList();
 
+        // TASK 2: Use the exact individual UI Text boxes to guarantee perfect mobile alignment
+        if (leaderboardSlotTexts != null && leaderboardSlotTexts.Length > 0) {
+            for(int i = 0; i < leaderboardSlotTexts.Length; i++) {
+                if (i < lbList.Count) {
+                    leaderboardSlotTexts[i].text = $"{lbList[i].Key} - {lbList[i].Value} pts";
+                } else {
+                    leaderboardSlotTexts[i].text = ""; // Clear empty slots
+                }
+            }
+        } 
+        
+        // Fallback to the old method if they haven't set up the new boxes yet
         string display = "";
         for(int i = 0; i < lbList.Count; i++) {
             display += $"{lbList[i].Key} - {lbList[i].Value} pts\n";
         }
-        leaderboardText.text = display;
+        if (leaderboardText != null) leaderboardText.text = display;
         
-
         ShowPage("leaderboard");
-
-        if (confettiVideoObject != null) PlayConfetti();
+        
+        // TASK 3: Only play confetti if the game was just completed
+        if (confettiVideoObject != null) {
+        if (hasGameJustEnded) {
+            PlayConfetti();
+            hasGameJustEnded = false; // Reset the flag
+        } else {
+            // If we are just viewing from the menu, make absolutely sure it stays hidden!
+            confettiVideoObject.SetActive(false);
+        }
+    }
     }
 
 
@@ -509,7 +556,6 @@ public class QuizManager : MonoBehaviour
             profileDisplayImage.sprite = profileSprite;
             ShowPage("profile");
             BackToGame();
-
         } else {
             GoToNeighborSelection();
             BackToGame();
@@ -519,14 +565,50 @@ public class QuizManager : MonoBehaviour
     public void OnSkipProfile() { GoToNeighborSelection(); }
 
     System.Collections.IEnumerator EnableButtonsAfterDelay() {
-        if (profileNextButton != null && profileHomeButton != null) {
-            profileNextButton.interactable = false;
-            profileHomeButton.interactable = false;
-            yield return new WaitForSeconds(3f);
-            profileNextButton.interactable = true;
-            profileHomeButton.interactable = true;
+    if (profileNextButton != null && profileHomeButton != null) {
+        Vector3 originalScale = Vector3.one; 
+        profileNextButton.transform.localScale = originalScale;
+
+        // Automatically get or add a CanvasGroup so the entire button + text blinks together
+        CanvasGroup canvasGroup = profileNextButton.GetComponent<CanvasGroup>();
+        if (canvasGroup == null) {
+            canvasGroup = profileNextButton.gameObject.AddComponent<CanvasGroup>();
         }
+        canvasGroup.alpha = 1f; // Make sure it starts fully visible
+
+        profileNextButton.interactable = false;
+        profileHomeButton.interactable = false;
+        
+        // Wait initial 3 seconds to enable buttons
+        yield return new WaitForSeconds(3f);
+        profileNextButton.interactable = true;
+        profileHomeButton.interactable = true;
+
+        // Wait an additional 2 seconds (5s total), then begin highlighting
+        yield return new WaitForSeconds(2f);
+
+        float timer = 0f;
+        while (profilePanel.activeSelf) {
+            // Speed modifier (Decrease to slow down BOTH the bounce and the blink)
+            timer += Time.deltaTime * 0.15f; 
+
+            // 1. BOUNCING LOGIC (Scales between 1.0 and 1.1)
+            float scaleAmount = 1f + Mathf.PingPong(timer, 0.1f); 
+            profileNextButton.transform.localScale = originalScale * scaleAmount;
+            
+            // 2. BLINKING LOGIC (Fades alpha down to 0.4, then back to 1.0)
+            // Mathf.PingPong(timer, 0.6f) bounces between 0.0 and 0.6
+            // Subtracting it from 1.0f leaves us with a perfect 1.0 to 0.4 oscillation
+            // canvasGroup.alpha = 1f - Mathf.PingPong(timer, 0.6f); 
+
+            yield return null;
+        }
+
+        // Safety reset when the loop ends
+        if (canvasGroup != null) canvasGroup.alpha = 1f;
+        profileNextButton.transform.localScale = originalScale;
     }
+}
 
     public void OpenHomeConfirmation() {
         if (confirmHomePanel) confirmHomePanel.SetActive(true);
@@ -542,16 +624,19 @@ public class QuizManager : MonoBehaviour
     }
 
     public void ShowHowToPlay() {
+        currentCreditsIndex = 0;
+        if (creditsPictures.Length > 0 && creditsDisplayContainer != null) {
+            creditsDisplayContainer.sprite = creditsPictures[0];
+        }
+        UpdateCreditsButtonState();
         ShowPage("howToPlay");
     }
 
     void PopulateList(List<string> items, Transform container, System.Action<string> onClickAction) {
-        // Save the current list data so the Up/Down buttons know what to load
         activePaginationList = items;
         activePaginationContainer = container;
         activePaginationAction = onClickAction;
         currentPageIndex = 0;
-
         RenderCurrentPage();
     }
 
@@ -583,6 +668,8 @@ public class QuizManager : MonoBehaviour
         if (currentPageIndex > 0) {
             currentPageIndex--;
             RenderCurrentPage();
+            
+            sharedBounceCooldown = bounceCooldownDuration; 
         }
     }
 
@@ -590,6 +677,35 @@ public class QuizManager : MonoBehaviour
         if ((currentPageIndex + 1) * itemsPerPage < activePaginationList.Count) {
             currentPageIndex++;
             RenderCurrentPage();
+            
+            sharedBounceCooldown = bounceCooldownDuration; 
+        }
+    }
+
+    System.Collections.IEnumerator BouncePaginationLoop() {
+        float bounceTimer = 0f;
+        while (true) {
+            if (sharedBounceCooldown > 0f) sharedBounceCooldown -= Time.deltaTime;
+
+            bounceTimer += Time.deltaTime * 0.15f; 
+            float scaleAmount = 1f + Mathf.PingPong(bounceTimer, 0.08f); 
+
+            foreach (Button btn in pageUpButtons) {
+                if (btn != null) {
+                    btn.transform.localScale = (btn.interactable && sharedBounceCooldown <= 0f) 
+                        ? Vector3.one * scaleAmount 
+                        : Vector3.one;
+                }
+            }
+
+            foreach (Button btn in pageDownButtons) {
+                if (btn != null) {
+                    btn.transform.localScale = (btn.interactable && sharedBounceCooldown <= 0f) 
+                        ? Vector3.one * scaleAmount 
+                        : Vector3.one;
+                }
+            }
+            yield return null;
         }
     }
 
@@ -600,63 +716,68 @@ public class QuizManager : MonoBehaviour
         neighborSelectPanel.SetActive(page == "neighborSelect");
         quizPanel.SetActive(page == "quiz");
         profilePanel.SetActive(page == "profile");
+        
         if (saveSlotPanel) saveSlotPanel.SetActive(page == "saveSlot");
         if (nameInputPanel) nameInputPanel.SetActive(page == "nameInput");
-        if (correctFeedbackPanel) correctFeedbackPanel.SetActive(page == "correctFeedback");
-        if (incorrectFeedbackPanel) incorrectFeedbackPanel.SetActive(page == "incorrectFeedback");
         if (leaderboardPanel) leaderboardPanel.SetActive(page == "leaderboard");
         if (howToPlayPanel) howToPlayPanel.SetActive(page == "howToPlay");
 
+        if (howToScanPanel) howToScanPanel.SetActive(page == "howToScan");
+        if (luxembourgScanPanel) luxembourgScanPanel.SetActive(page == "luxembourgScan");
+        if (euComicPanel1) euComicPanel1.SetActive(page == "euComic1");
+        if (euComicPanel2) euComicPanel2.SetActive(page == "euComic2");
+
         if (page == "profile") {
-           
             if (profileButtonCoroutine != null) StopCoroutine(profileButtonCoroutine);
             profileButtonCoroutine = StartCoroutine(EnableButtonsAfterDelay());
+        } else {
+            // Reset button scale and alpha completely if they leave the profile page
+            if (profileNextButton != null) {
+                profileNextButton.transform.localScale = Vector3.one;
+                CanvasGroup cg = profileNextButton.GetComponent<CanvasGroup>();
+                if (cg != null) cg.alpha = 1f;
+            }
         }
     }
 
     public void ViewProfiles(){
-        Application.OpenURL("https://drive.google.com/file/d/1bc5yHiK988qzkBvmqnq-LNJ5Hxezqxeq/view?usp=sharing");
+        Application.OpenURL("https://drive.google.com/file/d/1VidTSdDuHJbNw9VCanebqr2HuqgIdwVv/view?usp=drive_link");
     }
 
     System.Collections.IEnumerator FadeFeedback(bool isCorrect) {
-    // 1. Turn on the overlay object
-    fadeOverlayImage.gameObject.SetActive(true);
-    
-    // Pick green or red based on the answer correctness
-    Color targetColor = isCorrect ? Color.green : Color.red;
-    
-    // 2. Fade In to solid color
-    float alpha = 0f;
-    while (alpha < 1f) {
-        alpha += Time.deltaTime * fadeSpeed;
-        targetColor.a = Mathf.Clamp01(alpha);
-        fadeOverlayImage.color = targetColor;
-        yield return null;
+        fadeOverlayImage.gameObject.SetActive(true);
+        Color targetColor = isCorrect ? Color.green : Color.red;
+        
+        float alpha = 0f;
+        while (alpha < 1f) {
+            alpha += Time.deltaTime * fadeSpeed;
+            targetColor.a = Mathf.Clamp01(alpha);
+            fadeOverlayImage.color = targetColor;
+            yield return null;
+        }
+
+        if (isCorrect) {
+            if (currentTarget != null && currentTarget.name == "Luxembourg") {
+                ShowPage("luxembourgScan");
+            } else {
+                ShowPage("howToScan");
+            }
+        } else {
+            GenerateQuizOptions(); 
+            ShowPage("quiz");      
+        }
+
+        yield return new WaitForSeconds(0.15f);
+
+        while (alpha > 0f) {
+            alpha -= Time.deltaTime * fadeSpeed;
+            targetColor.a = Mathf.Clamp01(alpha);
+            fadeOverlayImage.color = targetColor;
+            yield return null;
+        }
+
+        fadeOverlayImage.gameObject.SetActive(false);
     }
-
-    // 3. Peak Opacity Action: Swap your UI pages behind the solid color curtain!
-    if (isCorrect) {
-        ShowPage("scanDummy");
-         // Seamlessly transition straight to the scan dummy panel
-    } else {
-        GenerateQuizOptions(); // Regenerate options to keep it fresh for the retry
-        ShowPage("quiz");      // Keep them on the quiz panel to try again
-    }
-
-    // Hold the solid color for a split second for impact
-    yield return new WaitForSeconds(0.15f);
-
-    // 4. Fade Out back to clear
-    while (alpha > 0f) {
-        alpha -= Time.deltaTime * fadeSpeed;
-        targetColor.a = Mathf.Clamp01(alpha);
-        fadeOverlayImage.color = targetColor;
-        yield return null;
-    }
-
-    // 5. Turn off the overlay completely so users can click buttons again
-    fadeOverlayImage.gameObject.SetActive(false);
-}
 
   public void OnCorrectAnswerSelected()
  {
@@ -677,4 +798,29 @@ public class QuizManager : MonoBehaviour
     ARsesh.SetActive(false);
     Lite3d.SetActive(false);
  }
+
+ public void OpenCreditsPanel() {
+        currentCreditsIndex = 0;
+        if (creditsPictures.Length > 0 && creditsDisplayContainer != null) {
+            creditsDisplayContainer.sprite = creditsPictures[0];
+        }
+        UpdateCreditsButtonState();
+        ShowPage("credits");
+    }
+
+    public void ShowNextCreditsPicture() {
+        if (creditsPictures.Length == 0) return;
+
+        if (currentCreditsIndex < creditsPictures.Length - 1) {
+            currentCreditsIndex++;
+            creditsDisplayContainer.sprite = creditsPictures[currentCreditsIndex];
+        }
+        UpdateCreditsButtonState();
+    }
+
+    private void UpdateCreditsButtonState() {
+        if (creditsNextButton != null) {
+            creditsNextButton.interactable = (currentCreditsIndex < creditsPictures.Length - 1);
+        }
+    }
 }

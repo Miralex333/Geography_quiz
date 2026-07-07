@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 3bb92794b356c03499d999889348aeeb
+guid: e6f88f48015992640a668242f9ad428d
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 156347501429396709
-    second: Romania_0
+      213: -5167168192989081995
+    second: Billboard_YourPoints_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -109,17 +109,30 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: WebGL
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Romania_0
+      name: Billboard_YourPoints_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 1080
-        height: 1527
+        x: 593
+        y: 1592
+        width: 350
+        height: 214
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 5e4183469357b2200800000000000000
-      internalID: 156347501429396709
+      spriteID: 57e4032c7e78a48b0800000000000000
+      internalID: -5167168192989081995
       vertices: []
       indices: 
       edges: []
@@ -148,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Romania_0: 156347501429396709
+      Billboard_YourPoints_0: -5167168192989081995
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
