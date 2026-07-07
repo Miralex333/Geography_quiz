@@ -47,6 +47,7 @@ public class QuizManager : MonoBehaviour
     public TMP_Text questionLabel;
     public TMP_Text[] statementButtons;
     public Image profileDisplayImage;
+    public TMP_Text puzzleInstructionText;
 
     [Header("Save Slot UI")]
     public TMP_Text[] saveSlotTexts;     
@@ -122,10 +123,13 @@ public class QuizManager : MonoBehaviour
     public string factText;
     public string category;
     public string arCategory;
+    public string startingCountry;
 
-    public float bounceCooldownDuration = 4.0f; // <-- CHANGE THIS VALUE TO INCREASE/DECREASE COOLDOWN (e.g., 5.0f is 5 seconds)
-
+    public float bounceCooldownDuration = 4.0f; 
     private float sharedBounceCooldown = 0f;
+    public Button scanNextButton;      
+    public Button luxembourgScanNextButton;
+    private float scanDelayTimer = 0f; 
 
 
 
@@ -302,7 +306,14 @@ public class QuizManager : MonoBehaviour
 
     public void ProceedToComic2() { ShowPage("euComic2"); }
     public void ProceedToStartSelect() { ShowPage("startSelect"); }
-    public void ProceedToScanDummy() { ShowPage("scanDummy"); }
+    public void ProceedToScanDummy() { 
+        
+        if (startingCountry == CurrentCountry) {
+            OnSkipScanClicked();
+        } else {
+            ShowPage("scanDummy");
+        }    
+    }
 
     public void DeleteSaveSlot(int slotIndex) {
         slotToDeleteIndex = slotIndex;
@@ -342,6 +353,7 @@ public class QuizManager : MonoBehaviour
         visitedCountries.Add(countryName);
         currentTarget = allCountries.Find(c => c.name == countryName); 
         CurrentCountry=currentTarget.name;
+        startingCountry=currentTarget.name;
         SaveGame();
        // OnCorrectAnswerSelected();
         //ShowPage("profile");
@@ -549,7 +561,6 @@ public class QuizManager : MonoBehaviour
     }
     }
 
-
     public void OnSkipScanClicked() {
         Sprite profileSprite = Resources.Load<Sprite>($"Profiles/{currentTarget.name}");
         if (profileSprite != null) {
@@ -705,11 +716,44 @@ public class QuizManager : MonoBehaviour
                         : Vector3.one;
                 }
             }
+
+            if (howToScanPanel != null && howToScanPanel.activeSelf) {
+                scanDelayTimer += Time.deltaTime; 
+                
+                if (scanNextButton != null) {
+                    scanNextButton.transform.localScale = (scanDelayTimer >= 3f) 
+                        ? Vector3.one * scaleAmount 
+                        : Vector3.one;
+                }
+            } else if (scanNextButton != null) {
+                scanNextButton.transform.localScale = Vector3.one;
+            }
+
+            if (luxembourgScanPanel != null && luxembourgScanPanel.activeSelf) {
+                scanDelayTimer += Time.deltaTime; 
+                
+                if (luxembourgScanNextButton != null) {
+                    luxembourgScanNextButton.transform.localScale = (scanDelayTimer >= 3f) 
+                        ? Vector3.one * scaleAmount 
+                        : Vector3.one;
+                }
+            } else if (luxembourgScanNextButton != null) {
+                luxembourgScanNextButton.transform.localScale = Vector3.one;
+            }
+
+
+
             yield return null;
         }
     }
 
     void ShowPage(string page) {
+        if ((page == "howToScan"||page=="luxembourgScan") && currentTarget != null) {
+            if (puzzleInstructionText != null) {
+                puzzleInstructionText.text = $"Find the puzzle piece for {currentTarget.name} and put it in the puzzle board.";
+            }
+            scanDelayTimer = 0f; 
+        }
         menuPanel.SetActive(page == "menu");
         startSelectPanel.SetActive(page == "startSelect");
         scanDummyPanel.SetActive(page == "scanDummy");

@@ -6058,6 +6058,7 @@ MonoBehaviour:
   - {fileID: 1376336480}
   - {fileID: 327357642}
   profileDisplayImage: {fileID: 1496824084}
+  puzzleInstructionText: {fileID: 1456842138}
   saveSlotTexts:
   - {fileID: 693357876}
   - {fileID: 330370146}
@@ -6110,7 +6111,10 @@ MonoBehaviour:
   factText: 
   category: 
   arCategory: 
+  startingCountry: 
   bounceCooldownDuration: 5
+  scanNextButton: {fileID: 1168676959}
+  luxembourgScanNextButton: {fileID: 1498690743}
 --- !u!4 &772147570
 Transform:
   m_ObjectHideFlags: 0
