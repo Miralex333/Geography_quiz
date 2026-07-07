@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TMPro;
 using System.Linq;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 [System.Serializable]
 public class CountryFact {
@@ -67,6 +68,19 @@ public class QuizManager : MonoBehaviour
     public AudioClip correctSound;
     public AudioClip incorrectSound;
 
+    [Header("Pagination Settings")]
+    public int itemsPerPage = 4;
+    public Button[] pageUpButtons;
+    public Button[] pageDownButtons;
+    private List<string> activePaginationList;
+    private Transform activePaginationContainer;
+    private System.Action<string> activePaginationAction;
+    private int currentPageIndex = 0;
+
+    [Header("End Game Assets")]
+    public GameObject confettiVideoObject;
+    public GameObject friendshipBookButton;
+
     private List<CountryData> allCountries = new List<CountryData>();
     private List<string> visitedCountries = new List<string>();
     private List<string> availableFrontier = new List<string>();
@@ -81,17 +95,21 @@ public class QuizManager : MonoBehaviour
     private int slotToDeleteIndex = -1;         
     private Coroutine profileButtonCoroutine;
 
-    // Safety lock state to prevent click-spam UI exploits
     private bool isAnswering = false;
 
     void Start() {
         Debug.Log("DEBUG: Starting QuizManager...");
         LoadCSV();
         Debug.Log("DEBUG: CSV Loaded, showing menu...");
+
+        if (friendshipBookButton != null) friendshipBookButton.SetActive(false);
+        // if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
         ShowPage("menu");
     }
 
     public void GoToMenu() { 
+        if (friendshipBookButton != null) friendshipBookButton.SetActive(false);
+        // if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
         ResetGameState();
         ShowPage("menu"); 
     }
@@ -164,27 +182,32 @@ public class QuizManager : MonoBehaviour
     }
 
     public void SelectSaveSlot(int slotIndex) {
-        currentSaveSlot = slotIndex;
-        string slotName = PlayerPrefs.GetString($"Slot{slotIndex}_Name", "");
+    currentSaveSlot = slotIndex;
+    string slotName = PlayerPrefs.GetString($"Slot{slotIndex}_Name", "");
 
-        if (string.IsNullOrEmpty(slotName)) {
-            currentPlayerName = "";
-            currentScore = 0;
+    if (string.IsNullOrEmpty(slotName)) {
+        currentPlayerName = "";
+        currentScore = 0;
+        visitedCountries.Clear();
+        availableFrontier.Clear();
+        playerNameInput.text = "";
+        ShowPage("nameInput");
+    } else {
+        currentPlayerName = slotName;
+        currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
+        string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
+                    
+        if(string.IsNullOrEmpty(visitedStr)){
             visitedCountries.Clear();
-            availableFrontier.Clear();
-
-            playerNameInput.text = "";
-            ShowPage("nameInput");
+            SaveGame();
+            PopulateList(allCountries.Select(c => c.name).ToList(), startSelectContent, OnStartCountryPicked);
+            ShowPage("startSelect");
         } else {
-            currentPlayerName = slotName;
-            currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
-            string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
-            
-            visitedCountries = string.IsNullOrEmpty(visitedStr) ? new List<string>() : visitedStr.Split('|').ToList();
-            
-            GoToNeighborSelection(); 
+            visitedCountries = visitedStr.Split('|').ToList(); 
+            GoToNeighborSelection();
         }
     }
+}
 
     public void ConfirmNewPlayerName() {
         if (!string.IsNullOrWhiteSpace(playerNameInput.text)) {
@@ -228,7 +251,6 @@ public class QuizManager : MonoBehaviour
         PlayerPrefs.SetString($"Slot{currentSaveSlot}_Name", currentPlayerName);
         PlayerPrefs.SetInt($"Slot{currentSaveSlot}_Score", currentScore);
         
-        // Fixed: Join using pipe characters so country data parsing doesn't break on commas
         PlayerPrefs.SetString($"Slot{currentSaveSlot}_Visited", string.Join("|", visitedCountries));
         PlayerPrefs.Save();
     }
@@ -366,7 +388,27 @@ public class QuizManager : MonoBehaviour
 
         ExecuteDeleteSaveSlot(currentSaveSlot);
 
+        if (friendshipBookButton != null) friendshipBookButton.SetActive(true);
+
+        if (confettiVideoObject != null) PlayConfetti();
+
         ShowLeaderboard();
+    }
+
+    void PlayConfetti() {
+        confettiVideoObject.SetActive(true);
+        VideoPlayer vp = confettiVideoObject.GetComponent<VideoPlayer>();
+        
+        if (vp != null) {
+            vp.loopPointReached -= DisableConfetti; // Safety check to prevent duplicate listeners
+            vp.loopPointReached += DisableConfetti; 
+            vp.Play();
+        }
+    }
+
+    void DisableConfetti(VideoPlayer vp) {
+        vp.loopPointReached -= DisableConfetti; // Clean up the listener
+        if (confettiVideoObject != null) confettiVideoObject.SetActive(false);
     }
 
     public void ShowLeaderboard() {
@@ -387,9 +429,13 @@ public class QuizManager : MonoBehaviour
             display += $"{lbList[i].Key} - {lbList[i].Value} pts\n";
         }
         leaderboardText.text = display;
+        
 
         ShowPage("leaderboard");
+
+        if (confettiVideoObject != null) PlayConfetti();
     }
+
 
     public void OnSkipScanClicked() {
         Sprite profileSprite = Resources.Load<Sprite>($"Profiles/{currentTarget.name}");
@@ -431,17 +477,52 @@ public class QuizManager : MonoBehaviour
     }
 
     void PopulateList(List<string> items, Transform container, System.Action<string> onClickAction) {
-    foreach (Transform child in container) Destroy(child.gameObject);
-    foreach (string item in items) {
-        GameObject btn = Instantiate(buttonPrefab, container);
-        btn.GetComponentInChildren<TMP_Text>().text = item;
-        
-        // ADD THIS LINE: Wipe any existing hardcoded events from the prefab
-        btn.GetComponent<Button>().onClick.RemoveAllListeners();
-        
-        btn.GetComponent<Button>().onClick.AddListener(() => onClickAction(item));
+        // Save the current list data so the Up/Down buttons know what to load
+        activePaginationList = items;
+        activePaginationContainer = container;
+        activePaginationAction = onClickAction;
+        currentPageIndex = 0;
+
+        RenderCurrentPage();
     }
-}
+
+    void RenderCurrentPage() {
+        foreach (Transform child in activePaginationContainer) Destroy(child.gameObject);
+
+        int startIndex = currentPageIndex * itemsPerPage;
+        int endIndex = Mathf.Min(startIndex + itemsPerPage, activePaginationList.Count);
+
+        for (int i = startIndex; i < endIndex; i++) {
+            string item = activePaginationList[i];
+            GameObject btn = Instantiate(buttonPrefab, activePaginationContainer);
+            btn.GetComponentInChildren<TMP_Text>().text = item;
+            
+            btn.GetComponent<Button>().onClick.RemoveAllListeners();
+            btn.GetComponent<Button>().onClick.AddListener(() => activePaginationAction(item));
+        }
+
+        foreach (Button btn in pageUpButtons) {
+            if (btn != null) btn.interactable = (currentPageIndex > 0);
+        }
+        
+        foreach (Button btn in pageDownButtons) {
+            if (btn != null) btn.interactable = (endIndex < activePaginationList.Count);
+        }
+    }
+
+    public void PageUp() {
+        if (currentPageIndex > 0) {
+            currentPageIndex--;
+            RenderCurrentPage();
+        }
+    }
+
+    public void PageDown() {
+        if ((currentPageIndex + 1) * itemsPerPage < activePaginationList.Count) {
+            currentPageIndex++;
+            RenderCurrentPage();
+        }
+    }
 
     void ShowPage(string page) {
         menuPanel.SetActive(page == "menu");
