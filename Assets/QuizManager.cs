@@ -97,6 +97,24 @@ public class QuizManager : MonoBehaviour
 
     private bool isAnswering = false;
 
+
+     [Header("ARReq")]
+     public GameObject BackImg;
+     public GameObject MAincam;
+     public GameObject GlobalLite;
+     public GameObject ARsesh;
+     public GameObject ARCam;
+     public GameObject Lite3d;
+     
+     public string     CurrentCountry="Null";
+
+   public  string factText;
+   public  string category;
+    public string arCategory;
+
+
+
+
     void Start() {
         Debug.Log("DEBUG: Starting QuizManager...");
         LoadCSV();
@@ -122,6 +140,7 @@ public class QuizManager : MonoBehaviour
         visitedCountries.Clear();
         availableFrontier.Clear();
         currentTarget = null;
+        CurrentCountry= null;
         correctStatement = "";
         isAnswering = false;
     }
@@ -138,13 +157,44 @@ public class QuizManager : MonoBehaviour
                 
                 for(int j = 1; j <= 4; j++) {
                     if (!string.IsNullOrWhiteSpace(row[j])) {
-                        string factText = row[j].Trim();
-                        string category = CategorizeFact(factText);
+                        factText = row[j].Trim();
+                        category = "funfact";
 
-                        if (factText.ToLower().Contains("flag looks like")) {
-                            factText = $"{factText}<br><size=100%><sprite=\"{country.name}\" index=0></size>"; 
-                        }   
+                        // string upperFact = factText.ToUpper();
+                        string upperFact;
+                        upperFact=factText.ToUpper();
+                        if (upperFact.StartsWith("[FLAG]"))
+                        {
+                            category = "flag";
+                            factText = factText.Substring(6).Trim();
+                        }
+                        else if (upperFact.StartsWith("[FOOD]"))
+                        {
+                            category = "food";
+                            factText = factText.Substring(6).Trim();
+                        }
+                        else if (upperFact.StartsWith("[LANDMARK]"))
+                        {
+                            category = "landmark";
+                            factText = factText.Substring(10).Trim();
+                        }
+                        else if (upperFact.StartsWith("[FUNFACT]"))
+                        {
+                            category = "funfact";
+                            factText = factText.Substring(9).Trim();
+                        }
+                        else
+                        {
+                            category = CategorizeFact(factText);
+                        }
+
+                        if (factText.ToLower().Contains("flag looks like"))
+                        {
+                            factText = $"{factText}<br><size=100%><sprite=\"{country.name}\" index=0></size>";
+                        }
                         country.facts.Add(new CountryFact { text = factText, category = category });
+
+                      
                     }
                 }
 
@@ -181,33 +231,40 @@ public class QuizManager : MonoBehaviour
         }
     }
 
-    public void SelectSaveSlot(int slotIndex) {
-    currentSaveSlot = slotIndex;
-    string slotName = PlayerPrefs.GetString($"Slot{slotIndex}_Name", "");
+    public void SelectSaveSlot(int slotIndex)
+    {
+        currentSaveSlot = slotIndex;
+        string slotName = PlayerPrefs.GetString($"Slot{slotIndex}_Name", "");
 
-    if (string.IsNullOrEmpty(slotName)) {
-        currentPlayerName = "";
-        currentScore = 0;
-        visitedCountries.Clear();
-        availableFrontier.Clear();
-        playerNameInput.text = "";
-        ShowPage("nameInput");
-    } else {
-        currentPlayerName = slotName;
-        currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
-        string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
-                    
-        if(string.IsNullOrEmpty(visitedStr)){
+        if (string.IsNullOrEmpty(slotName))
+        {
+            currentPlayerName = "";
+            currentScore = 0;
             visitedCountries.Clear();
-            SaveGame();
-            PopulateList(allCountries.Select(c => c.name).ToList(), startSelectContent, OnStartCountryPicked);
-            ShowPage("startSelect");
-        } else {
-            visitedCountries = visitedStr.Split('|').ToList(); 
-            GoToNeighborSelection();
+            availableFrontier.Clear();
+            playerNameInput.text = "";
+            ShowPage("nameInput");
+        }
+        else
+        {
+            currentPlayerName = slotName;
+            currentScore = PlayerPrefs.GetInt($"Slot{slotIndex}_Score", 0);
+            string visitedStr = PlayerPrefs.GetString($"Slot{slotIndex}_Visited", "");
+
+            if (string.IsNullOrEmpty(visitedStr))
+            {
+                visitedCountries.Clear();
+                SaveGame();
+                PopulateList(allCountries.Select(c => c.name).ToList(), startSelectContent, OnStartCountryPicked);
+                ShowPage("startSelect");
+            }
+            else
+            {
+                visitedCountries = visitedStr.Split('|').ToList();
+                GoToNeighborSelection();
+            }
         }
     }
-}
 
     public void ConfirmNewPlayerName() {
         if (!string.IsNullOrWhiteSpace(playerNameInput.text)) {
@@ -258,8 +315,12 @@ public class QuizManager : MonoBehaviour
     void OnStartCountryPicked(string countryName) {
         visitedCountries.Add(countryName);
         currentTarget = allCountries.Find(c => c.name == countryName); 
+        CurrentCountry=currentTarget.name;
         SaveGame();
-        ShowPage("scanDummy");
+       // OnCorrectAnswerSelected();
+        //ShowPage("profile");
+        OnSkipScanClicked();
+        
     }
 
     public void GoToNeighborSelection() {
@@ -287,6 +348,7 @@ public class QuizManager : MonoBehaviour
 
     void OnNeighborPicked(string countryName) {
         currentTarget = allCountries.Find(c => c.name == countryName);
+        CurrentCountry=currentTarget.name;
         currentAttempts = 0; 
         GenerateQuizOptions();
         ShowPage("quiz");
@@ -328,6 +390,7 @@ public class QuizManager : MonoBehaviour
 
         var matchingFacts = facts.Where(f => f.category == targetCategory).ToList();
         if (matchingFacts.Count > 0) {
+            arCategory = matchingFacts[0].category;
             return matchingFacts[Random.Range(0, matchingFacts.Count)].text;
         }
         return facts[Random.Range(0, facts.Count)].text;
@@ -350,7 +413,9 @@ public class QuizManager : MonoBehaviour
             SaveGame();
             if (audioSource != null && correctSound != null) audioSource.PlayOneShot(correctSound);
             StartCoroutine(FadeFeedback(true));
+            OnCorrectAnswerSelected();
             //ShowPage("correctFeedback");
+            Debug.Log(arCategory);
         } else {
             currentAttempts++;
             if (audioSource != null && incorrectSound != null) audioSource.PlayOneShot(incorrectSound);
@@ -360,9 +425,10 @@ public class QuizManager : MonoBehaviour
     }
 
 
-    public void ProceedFromCorrectFeedback() {
+    /*public void ProceedFromCorrectFeedback() {
         ShowPage("scanDummy");
-    }
+        
+    }*/
 
     void EndGame() {
         string[] names = PlayerPrefs.GetString("LeaderboardNames", "").Split(new char[]{','}, System.StringSplitOptions.RemoveEmptyEntries);
@@ -390,7 +456,7 @@ public class QuizManager : MonoBehaviour
 
         if (friendshipBookButton != null) friendshipBookButton.SetActive(true);
 
-        if (confettiVideoObject != null) PlayConfetti();
+        // if (confettiVideoObject != null) PlayConfetti();
 
         ShowLeaderboard();
     }
@@ -442,8 +508,11 @@ public class QuizManager : MonoBehaviour
         if (profileSprite != null) {
             profileDisplayImage.sprite = profileSprite;
             ShowPage("profile");
+            BackToGame();
+
         } else {
             GoToNeighborSelection();
+            BackToGame();
         }
     }
 
@@ -539,6 +608,7 @@ public class QuizManager : MonoBehaviour
         if (howToPlayPanel) howToPlayPanel.SetActive(page == "howToPlay");
 
         if (page == "profile") {
+           
             if (profileButtonCoroutine != null) StopCoroutine(profileButtonCoroutine);
             profileButtonCoroutine = StartCoroutine(EnableButtonsAfterDelay());
         }
@@ -566,7 +636,8 @@ public class QuizManager : MonoBehaviour
 
     // 3. Peak Opacity Action: Swap your UI pages behind the solid color curtain!
     if (isCorrect) {
-        ShowPage("scanDummy"); // Seamlessly transition straight to the scan dummy panel
+        ShowPage("scanDummy");
+         // Seamlessly transition straight to the scan dummy panel
     } else {
         GenerateQuizOptions(); // Regenerate options to keep it fresh for the retry
         ShowPage("quiz");      // Keep them on the quiz panel to try again
@@ -586,4 +657,24 @@ public class QuizManager : MonoBehaviour
     // 5. Turn off the overlay completely so users can click buttons again
     fadeOverlayImage.gameObject.SetActive(false);
 }
+
+  public void OnCorrectAnswerSelected()
+ {
+    MAincam.SetActive(false);
+    BackImg.SetActive(false);
+    GlobalLite.SetActive(false);
+    ARCam.SetActive(true);
+    ARsesh.SetActive(true);
+    Lite3d.SetActive(true);
+ }
+
+ public void BackToGame()
+ {
+    MAincam.SetActive(true);
+    BackImg.SetActive(true);
+    GlobalLite.SetActive(true);
+    ARCam.SetActive(false);
+    ARsesh.SetActive(false);
+    Lite3d.SetActive(false);
+ }
 }

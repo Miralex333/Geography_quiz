@@ -7,33 +7,24 @@ public class ImageZoomPan : MonoBehaviour, IDragHandler
     public float zoomSpeed = 0.005f;
     public float minZoom = 1f;
     public float maxZoom = 5f;
-    
-    [Header("Boundary Settings")]
-    [Tooltip("Increases how far you can pull the image corners toward the center of the screen.")]
-    public float cornerPadding = 150f; 
 
     private Vector2 originalPosition;
-    private Canvas parentCanvas;
 
     void Start()
     {
-        // Safety check to automatically grab the RectTransform
+        // 1. SAFETY NET: If anyone forgot to link it on another PC, 
+        // the script automatically finds itself so it never breaks!
         if (imageRect == null)
         {
             imageRect = GetComponent<RectTransform>();
         }
         
-        if (imageRect != null) 
-        {
-            originalPosition = imageRect.anchoredPosition;
-            // Find the main UI canvas to fix the drag sensitivity
-            parentCanvas = imageRect.GetComponentInParent<Canvas>();
-        }
+        if (imageRect != null) originalPosition = imageRect.anchoredPosition;
     }
 
     void Update()
     {
-        // 1. Mobile Pinch-to-Zoom
+        // Pinch-to-zoom loop
         if (Input.touchCount == 2)
         {
             Touch touchZero = Input.GetTouch(0);
@@ -49,57 +40,27 @@ public class ImageZoomPan : MonoBehaviour, IDragHandler
 
             Zoom(difference * zoomSpeed);
         }
-        // 2. Editor Testing Fallback
-        else
-        {
-            float scrollInput = Input.GetAxis("Mouse ScrollWheel");
-            if (scrollInput != 0)
-            {
-                Zoom(scrollInput * 50f * zoomSpeed);
-            }
-        }
     }
 
     void Zoom(float increment)
     {
-        if (imageRect == null) return; 
+        if (imageRect == null) return; // 2. Prevents background crashes if missing
 
         Vector3 newScale = imageRect.localScale + new Vector3(increment, increment, 0);
         newScale.x = Mathf.Clamp(newScale.x, minZoom, maxZoom);
         newScale.y = Mathf.Clamp(newScale.y, minZoom, maxZoom);
         imageRect.localScale = newScale;
         
-        ClampPosition();
+        if (newScale.x <= minZoom) imageRect.anchoredPosition = originalPosition;
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        if (imageRect == null) return; 
+        if (imageRect == null) return; // 2. Safety check
 
         if (Input.touchCount <= 1 && imageRect.localScale.x > 1f)
         {
-            // FIX: Divide by the Canvas scale factor so the drag matches finger speed 1:1
-            float scaleFactor = parentCanvas != null ? parentCanvas.scaleFactor : 1f;
-            imageRect.anchoredPosition += eventData.delta / scaleFactor;
-            
-            ClampPosition();
+            imageRect.anchoredPosition += eventData.delta;
         }
-    }
-
-    private void ClampPosition()
-    {
-        // Calculate the base maximum allowed movement
-        float boundsX = (imageRect.rect.width * imageRect.localScale.x - imageRect.rect.width) / 2f;
-        float boundsY = (imageRect.rect.height * imageRect.localScale.y - imageRect.rect.height) / 2f;
-
-        // FIX: Add padding to the bounds so you can reach the corners comfortably
-        boundsX += cornerPadding;
-        boundsY += cornerPadding;
-
-        // Apply the restriction
-        Vector2 clampedPosition = imageRect.anchoredPosition;
-        clampedPosition.x = Mathf.Clamp(clampedPosition.x, originalPosition.x - boundsX, originalPosition.x + boundsX);
-        clampedPosition.y = Mathf.Clamp(clampedPosition.y, originalPosition.y - boundsY, originalPosition.y + boundsY);
-        imageRect.anchoredPosition = clampedPosition;
     }
 }
