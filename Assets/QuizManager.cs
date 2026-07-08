@@ -785,7 +785,7 @@ public class QuizManager : MonoBehaviour
     }
 
     public void ViewProfiles(){
-        Application.OpenURL("https://drive.google.com/file/d/1VidTSdDuHJbNw9VCanebqr2HuqgIdwVv/view?usp=drive_link");
+        Application.OpenURL("https://drive.google.com/file/d/1ZFMfvn9OtI7hcJj2usIbQrqKIPCCqWjb/view?usp=drivesdk");
     }
 
     System.Collections.IEnumerator FadeFeedback(bool isCorrect) {
